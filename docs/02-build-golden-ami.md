@@ -76,7 +76,7 @@ node -v && git --version
 cat > /etc/systemd/system/guestbook.service <<'EOF'
 [Unit]
 Description=CMP Guestbook App
-After=network.target cloud-final.service
+After=network.target
 
 [Service]
 Type=simple

@@ -52,6 +52,12 @@ APP_DIR="/opt/guestbook"
 APP_REPO_URL="https://github.com/cloud-mentor-pro/cmp-guestbook-app.git"
 APP_REF="main"   # cố định "main" cho toàn bộ lab
 
+# AMI v1 co unit After=cloud-final.service. User Data chay trong cloud-final,
+# nen restart service tai day co the tao ordering wait. Bo dependency nay
+# truoc khi start app trong qua trinh bootstrap.
+sed -i 's/ cloud-final.service//g' /etc/systemd/system/guestbook.service
+systemctl daemon-reload
+
 # Biến môi trường cho systemd (EnvironmentFile=-/etc/guestbook.env, đã khai
 # báo sẵn trong systemd unit ở bước 02)
 cat > /etc/guestbook.env <<ENV
