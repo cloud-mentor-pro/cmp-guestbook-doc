@@ -47,30 +47,6 @@ và yêu cầu ASG thay thế instance (Instance Refresh); instance mới sẽ t
 5. Sau khi Instance Refresh hoàn tất → xác nhận toàn bộ trang web hiển
    thị phiên bản v2.
 
-## Điểm nhấn giảng dạy
-
-- Nhấn mạnh: **Launch Template không đổi** — vẫn dùng AMI v1. Chỉ có
-  code trên GitHub thay đổi. Đây chính là điểm khác biệt cốt lõi so
-  với bước 10.
-- Liên hệ thực tế: đây là mô hình đơn giản hóa của một pipeline CI/CD
-  (ví dụ GitHub Actions + CodeDeploy/CodePipeline sẽ tự động hóa đúng
-  các bước thủ công này — trigger tự động ngay khi có commit/tag mới,
-  thay vì bấm Instance Refresh thủ công).
-- Nhấn mạnh vai trò `MinHealthySize`/`Min healthy percentage` trong việc
-  đảm bảo zero/giảm thiểu downtime khi rolling deploy.
-- **Câu hỏi thảo luận (trade-off của pattern `git pull` lúc boot):**
-  đây KHÔNG phải best practice cho production. Instance mới lúc
-  scale-out phụ thuộc GitHub + NAT Gateway phải sống thì mới boot
-  healthy được — nếu GitHub down hoặc NAT Gateway (đã là SPOF trong lab
-  này, xem bước 01) gặp sự cố đúng lúc traffic tăng đột biến, ASG có
-  thể không launch được instance mới nào cả. Ngoài ra nếu `APP_REF`
-  trỏ vào branch di động thay vì commit/tag cố định, các instance
-  launch lệch nhau vài phút có thể chạy khác phiên bản code. Hỏi học
-  viên: production thật nên cải tiến theo hướng nào? (gợi ý: CodeDeploy
-  kéo artifact đã build từ S3, hoặc bake code thẳng vào AMI — đánh đổi
-  là mất đi việc "chỉ cần push code, không cần build lại AMI" như demo
-  này).
-
 ## Checklist hoàn thành bước này
 
 - [ ] Code v2 đã push/merge lên branch `main` (đúng `APP_REF` User Data đang dùng, không đổi sang tag)

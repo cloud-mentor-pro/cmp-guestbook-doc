@@ -45,14 +45,6 @@ sau, đúng bản chất của kiến trúc ALB + ASG.
 4. Test truy cập ứng dụng qua domain mới thay vì ALB DNS name thô — từ
    giờ dùng domain này cho 2 demo deploy ở bước 09-10.
 
-## Điểm nhấn giảng dạy
-
-- Nhấn mạnh lợi ích của **Alias record** so với CNAME thông thường:
-  không tính phí truy vấn, tự động cập nhật nếu ALB đổi IP, hỗ trợ apex
-  domain (root domain) mà CNAME không làm được.
-- Liên hệ: đây là bước cuối cùng hoàn thiện trải nghiệm người dùng —
-  từ giờ học viên có thể chia sẻ 1 domain dễ nhớ thay vì ALB DNS dài.
-
 ## Checklist hoàn thành bước này
 
 - [ ] Alias Record (type A) trỏ đúng vào ALB

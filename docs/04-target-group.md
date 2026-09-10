@@ -24,14 +24,6 @@
 6. Chưa cần đăng ký target nào ở bước này — để trống, vì instance sẽ do
    ASG tự động đăng ký ở bước 06.
 
-## Điểm nhấn giảng dạy
-
-- Nhấn mạnh: Target Group **độc lập** với ALB — có thể tồn tại mà chưa
-  gắn ALB nào, và 1 Target Group không tự động biết instance nào tồn
-  tại — phải có thứ gì đó (ASG hoặc thủ công) đăng ký vào.
-- Liên hệ health check với khả năng tự phục hồi (self-healing) của ASG
-  ở bước 06: khi 1 instance unhealthy, ASG sẽ terminate và tạo instance mới.
-
 ## Checklist hoàn thành bước này
 
 - [ ] Target Group đã tạo, protocol/port đúng (HTTP:80)

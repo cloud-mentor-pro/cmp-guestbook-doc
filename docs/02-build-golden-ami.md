@@ -136,26 +136,13 @@ exit    # thoát SSM session, quay lại local (tương tự)
 
 ## Checklist hoàn thành bước này
 
-- [x] Bastion đã cài đúng Node.js + `git`, có sẵn systemd unit
+- [ ] Bastion đã cài đúng Node.js + `git`, có sẵn systemd unit
       `guestbook.service`
-- [x] Đã cài `git` (bắt buộc để User Data pull code từ GitHub ở bước 06)
+- [ ] Đã cài `git` (bắt buộc để User Data pull code từ GitHub ở bước 06)
 - [ ] Đã chạy `rm -rf /var/lib/amazon/ssm` rồi `systemctl stop
       amazon-ssm-agent` (đúng thứ tự) ngay trong session, **trước khi**
       Create Image
-- [x] Đã bấm Create Image, đặt tên có version rõ ràng (`-v1`)
-- [x] Đã chuyển sang bước 03 ngay, **không ngồi chờ** AMI hoàn tất
+- [ ] Đã bấm Create Image, đặt tên có version rõ ràng (`-v1`)
+- [ ] Đã chuyển sang bước 03 ngay, **không ngồi chờ** AMI hoàn tất
 - [ ] Trước khi vào bước 06: xác nhận AMI ở trạng thái `available`
 - [ ] Ghi lại AMI ID vào note chung của lớp (để dùng cho Launch Template)
-
-## Liên hệ tới bước 10 (Deploy đổi AMI)
-
-Ở cuối bước 07 (test xong), giảng viên sẽ bấm Create Image **lần 2**
-(AMI v2, có thay đổi nhỏ ở tầng runtime) để nó kịp `available` khi đến
-bước 10. Chi tiết xem trong file `10-deploy-thay-doi-ami.md`.
-
-> Lưu ý: đến lúc đó Bastion sẽ **lại** đang online SSM (bình thường, vì
-> agent tự đăng ký lại cho Bastion sau khi build AMI v1) — phải **lặp
-> lại bước 7 y hệt**: SSM vào Bastion, `rm -rf /var/lib/amazon/ssm` rồi
-> `systemctl stop amazon-ssm-agent` (xoá trước, dừng sau), **không**
-> start lại, ngay trước khi bấm Create Image lần 2 — nếu không AMI v2 sẽ
-> dính đúng lỗi `TargetNotConnected` tương tự AMI v1.

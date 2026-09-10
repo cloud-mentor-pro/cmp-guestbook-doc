@@ -27,15 +27,6 @@
 9. Tạo xong → ghi lại **ALB DNS name** để dùng test ở bước 07 và cấu
    hình Route 53 ở bước 08.
 
-## Điểm nhấn giảng dạy
-
-- Giải thích listener rule mặc định (forward toàn bộ traffic đến 1
-  Target Group) — liên hệ tới path-based/host-based routing như một
-  chủ đề nâng cao (không cần thực hành trong lab này).
-- Nhấn mạnh: ALB **chưa có instance nào phía sau** — sẽ hiển thị lỗi
-  `503 Service Temporarily Unavailable` cho đến khi ASG ở bước 06 đăng
-  ký instance khỏe mạnh vào Target Group.
-
 ## Checklist hoàn thành bước này
 
 - [ ] ALB ở trạng thái `Active`

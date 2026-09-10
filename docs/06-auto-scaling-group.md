@@ -81,11 +81,6 @@ npm install --production
 systemctl restart guestbook.service
 ```
 
-> Script này **nhỏ, cố định** — không đổi giữa các lần deploy code (đúng
-> nguyên tắc tách AMI/Code ở CLAUDE.md). Muốn deploy code mới chỉ cần push
-> lên `main` + Instance Refresh, **không sửa User Data/Launch Template** —
-> xem chi tiết ở `docs/09-deploy-thay-doi-code.md`.
-
 ## Phần 2 — Auto Scaling Group
 
 Đặt tên `lab-guestbook-asg`:
@@ -103,17 +98,11 @@ systemctl restart guestbook.service
    ghi chú đây là chủ đề có thể mở rộng ở buổi sau (target tracking,
    scheduled scaling...).
 
-## Điểm nhấn giảng dạy
-
-- Sau khi ASG tạo xong, quan sát trực tiếp trên Target Group: instance
-  chuyển từ `initial` → `healthy`.
-- Đây là thời điểm tốt để quay lại ALB DNS và thấy lỗi 503 biến mất.
-
 ## Checklist hoàn thành bước này
 
-- [x] Launch Template tạo thành công, đúng AMI/SG/IAM Profile/User Data
-- [x] ASG đặt trong App Subnet (private), gắn đúng Target Group
-- [x] Health check type: ELB
-- [x] Desired capacity đạt, tất cả instance ở trạng thái `healthy` trong Target Group
-- [x] Đã set đúng biến môi trường DB_HOST/DB_USER/DB_PASS/DB_NAME/S3_BUCKET/APP_REPO_URL/APP_REF/AWS_REGION trong User Data
-- [x] Xác nhận `git clone`/`git pull` chạy thành công lúc instance khởi động (kiểm tra qua log User Data nếu cần)
+- [ ] Launch Template tạo thành công, đúng AMI/SG/IAM Profile/User Data
+- [ ] ASG đặt trong App Subnet (private), gắn đúng Target Group
+- [ ] Health check type: ELB
+- [ ] Desired capacity đạt, tất cả instance ở trạng thái `healthy` trong Target Group
+- [ ] Đã set đúng biến môi trường DB_HOST/DB_USER/DB_PASS/DB_NAME/S3_BUCKET/APP_REPO_URL/APP_REF/AWS_REGION trong User Data
+- [ ] Xác nhận `git clone`/`git pull` chạy thành công lúc instance khởi động (kiểm tra qua log User Data nếu cần)

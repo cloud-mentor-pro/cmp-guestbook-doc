@@ -85,7 +85,7 @@ Các giá trị này sẽ được dùng lại ở các bước thủ công ti�
 
 ## Checklist hoàn thành bước này
 
-- [x] Stack CloudFormation ở trạng thái `CREATE_COMPLETE`
-- [x] Vào được Bastion qua SSM Session Manager (Console → EC2 → Connect → Session Manager)
-- [x] Xác nhận Bastion instance có Instance Profile đúng (kiểm tra qua `aws sts get-caller-identity` trong session)
-- [x] Ghi lại các Output cần dùng cho bước 02-06 (có thể copy vào 1 file note hoặc dùng trực tiếp qua `aws cloudformation describe-stacks`)
+- [ ] Stack CloudFormation ở trạng thái `CREATE_COMPLETE`
+- [ ] Vào được Bastion qua SSM Session Manager (Console → EC2 → Connect → Session Manager)
+- [ ] Xác nhận Bastion instance có Instance Profile đúng (kiểm tra qua `aws sts get-caller-identity` trong session)
+- [ ] Ghi lại các Output cần dùng cho bước 02-06 (có thể copy vào 1 file note hoặc dùng trực tiếp qua `aws cloudformation describe-stacks`)
