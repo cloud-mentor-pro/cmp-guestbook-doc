@@ -1,0 +1,42 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "lab"
+  },
+  {
+    "ParameterKey": "AppDomainName",
+    "ParameterValue": "guestbook.cloudmentor-pro.click"
+  },
+  {
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.9.0.0/16"
+  },
+  {
+    "ParameterKey": "PublicSubnet1Cidr",
+    "ParameterValue": "10.9.0.0/24"
+  },
+  {
+    "ParameterKey": "PublicSubnet2Cidr",
+    "ParameterValue": "10.9.1.0/24"
+  },
+  {
+    "ParameterKey": "AppSubnet1Cidr",
+    "ParameterValue": "10.9.10.0/24"
+  },
+  {
+    "ParameterKey": "AppSubnet2Cidr",
+    "ParameterValue": "10.9.11.0/24"
+  },
+  {
+    "ParameterKey": "DbSubnet1Cidr",
+    "ParameterValue": "10.9.20.0/24"
+  },
+  {
+    "ParameterKey": "DbSubnet2Cidr",
+    "ParameterValue": "10.9.21.0/24"
+  },
+  {
+    "ParameterKey": "BastionInstanceType",
+    "ParameterValue": "t3.micro"
+  }
+]

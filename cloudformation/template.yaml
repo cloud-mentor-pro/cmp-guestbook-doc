@@ -1,0 +1,523 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  cmp-guestbook - Foundation stack: VPC 3-tier (6 subnet, 2 AZ), Security
+  Groups, IAM Role/Instance Profile, S3 Bucket, Bastion Host (AWS SAA lab
+  - Load Balancer & Auto Scaling Group - Cloud Mentor Pro). Region cố
+  định: us-east-1. Xem CLAUDE.md của repo cmp-guestbook-doc để biết đầy
+  đủ quyết định thiết kế và naming convention.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: lab
+    AllowedPattern: '^[a-z0-9-]+$'
+    Description: >
+      Prefix đặt tên tài nguyên. Mặc định "lab" (mỗi học viên có 1 AWS
+      account riêng). Chỉ đổi thành "lab-<alias>" nếu dùng chung 1
+      account cho nhiều học viên - xem CLAUDE.md, mục "Naming Convention".
+
+  AppDomainName:
+    Type: String
+    Description: >
+      Domain riêng của học viên (vd guestbook.cloudmentor.pro), đã có sẵn
+      Hosted Zone trước buổi học. Dùng để cấu hình CORS cho S3 Bucket
+      ngay từ bước này, dù Alias Record thật sự chỉ tạo ở bước 08.
+
+  VpcCidr:
+    Type: String
+    Default: 10.9.0.0/16
+    Description: >
+      Cố ý tránh dải 10.0.0.0/16 (mặc định phổ biến, dễ trùng với VPC khác
+      đã có sẵn trong cùng account - vd project tgw-nlb-app-infra).
+
+  PublicSubnet1Cidr:
+    Type: String
+    Default: 10.9.0.0/24
+
+  PublicSubnet2Cidr:
+    Type: String
+    Default: 10.9.1.0/24
+
+  AppSubnet1Cidr:
+    Type: String
+    Default: 10.9.10.0/24
+
+  AppSubnet2Cidr:
+    Type: String
+    Default: 10.9.11.0/24
+
+  DbSubnet1Cidr:
+    Type: String
+    Default: 10.9.20.0/24
+
+  DbSubnet2Cidr:
+    Type: String
+    Default: 10.9.21.0/24
+
+  BastionAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Auto-resolved AMI Amazon Linux 2023 mới nhất - dùng cho Bastion (AMI-builder)
+
+  BastionInstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small]
+
+Resources:
+
+  # ── Networking: VPC 3-tier, 6 subnet, 2 AZ ──────────────────────────────
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-vpc' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-igw' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  SubnetPublic1:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      guard:
+        SuppressedRules:
+          - SUBNET_AUTO_ASSIGN_PUBLIC_IP_DISABLED
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet1Cidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-subnet-public-1' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SubnetPublic2:
+    Type: AWS::EC2::Subnet
+    Metadata:
+      guard:
+        SuppressedRules:
+          - SUBNET_AUTO_ASSIGN_PUBLIC_IP_DISABLED
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnet2Cidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-subnet-public-2' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SubnetApp1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref AppSubnet1Cidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-subnet-app-1' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SubnetApp2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref AppSubnet2Cidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-subnet-app-2' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SubnetDb1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref DbSubnet1Cidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-subnet-db-1' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SubnetDb2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref DbSubnet2Cidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-subnet-db-2' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  # NAT Gateway: 1 cái duy nhất, đặt ở Public Subnet AZ-1
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-nat-eip' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref SubnetPublic1
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-nat' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  # ── Route Table: Public (→ IGW) ─────────────────────────────────────────
+  RouteTablePublic:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-rtb-public' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  RoutePublicInternet:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  AssocPublic1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublic1
+      RouteTableId: !Ref RouteTablePublic
+
+  AssocPublic2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublic2
+      RouteTableId: !Ref RouteTablePublic
+
+  # ── Route Table: App (→ NAT Gateway, để git clone GitHub + SSM) ────────
+  RouteTableApp:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-rtb-app' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  RouteAppNat:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTableApp
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  AssocApp1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetApp1
+      RouteTableId: !Ref RouteTableApp
+
+  AssocApp2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetApp2
+      RouteTableId: !Ref RouteTableApp
+
+  # ── Route Table: DB (hoàn toàn private - không có route ra internet) ──
+  RouteTableDb:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-rtb-db' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  AssocDb1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetDb1
+      RouteTableId: !Ref RouteTableDb
+
+  AssocDb2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetDb2
+      RouteTableId: !Ref RouteTableDb
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub '${Environment}-guestbook-dbsubnetgroup'
+      DBSubnetGroupDescription: !Sub '${Environment}-guestbook DB Subnet Group (private, 2 AZ)'
+      SubnetIds: [!Ref SubnetDb1, !Ref SubnetDb2]
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-dbsubnetgroup' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  # ── Security Groups ──────────────────────────────────────────────────────
+  SecurityGroupBastion:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-guestbook-sg-bastion'
+      GroupDescription: Bastion - khong mo inbound, truy cap qua SSM Session Manager
+      VpcId: !Ref Vpc
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-sg-bastion' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SecurityGroupAlb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-guestbook-sg-alb'
+      GroupDescription: ALB - inbound 80/443 tu internet
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80,  ToPort: 80,  CidrIp: 0.0.0.0/0, Description: HTTP from internet }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: HTTPS from internet (ACM optional) }
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-sg-alb' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SecurityGroupApp:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-guestbook-sg-app'
+      GroupDescription: App instances - inbound 80 chi tu ALB SG
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref SecurityGroupAlb
+          Description: HTTP from ALB only
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-sg-app' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  SecurityGroupDb:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${Environment}-guestbook-sg-db'
+      GroupDescription: RDS - inbound 3306 tu App SG va Bastion SG (SSM tunnel)
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref SecurityGroupApp
+          Description: MySQL from App instances
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref SecurityGroupBastion
+          Description: MySQL from Bastion (SSM port-forwarding tunnel tu local)
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-sg-db' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  # ── IAM Role/Instance Profile: App instances ────────────────────────────
+  IamRoleApp:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-guestbook-role-app'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: GuestbookImagesS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub '${S3BucketGuestbook.Arn}/*'
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-role-app' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  IamInstanceProfileApp:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${Environment}-guestbook-profile-app'
+      Roles: [!Ref IamRoleApp]
+
+  # ── IAM Role/Instance Profile: Bastion (AMI-builder) ────────────────────
+  IamRoleBastion:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${Environment}-guestbook-role-bastion'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: ec2.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: AmiBuilderAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: AmiBuilder
+                Effect: Allow
+                Action: [ec2:CreateImage, ec2:DescribeImages, ec2:DescribeInstances]
+                Resource: '*'
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-role-bastion' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  IamInstanceProfileBastion:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub '${Environment}-guestbook-profile-bastion'
+      Roles: [!Ref IamRoleBastion]
+
+  # ── S3 Bucket: chỉ lưu ảnh guestbook (presigned URL cả 2 chiều PUT/GET),
+  # KHÔNG chứa code ứng dụng, KHÔNG public (Block Public Access bật đủ) ──
+  S3BucketGuestbook:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Environment}-guestbook-s3-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - http://localhost:3000
+              - !Sub 'http://*.${AWS::Region}.elb.amazonaws.com'
+              - !Sub 'http://${AppDomainName}'
+            AllowedMethods: [GET, PUT]
+            AllowedHeaders: ['*']
+            ExposedHeaders: [ETag]
+            MaxAge: 3000
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-s3' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+  # ── Bastion Host: AMI-builder, Public Subnet AZ-1, truy cập qua SSM ────
+  BastionInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref BastionAmiId
+      InstanceType: !Ref BastionInstanceType
+      IamInstanceProfile: !Ref IamInstanceProfileBastion
+      SubnetId: !Ref SubnetPublic1
+      SecurityGroupIds: [!Ref SecurityGroupBastion]
+      # Khong KeyName - truy cap qua SSM Session Manager only
+      Tags:
+        - { Key: Name,        Value: !Sub '${Environment}-guestbook-bastion' }
+        - { Key: Environment, Value: !Ref Environment }
+        - { Key: Project,     Value: guestbook }
+
+Outputs:
+  VpcId:
+    Value: !Ref Vpc
+    Export: { Name: !Sub '${AWS::StackName}-VpcId' }
+
+  SubnetPublic1Id:
+    Value: !Ref SubnetPublic1
+    Export: { Name: !Sub '${AWS::StackName}-SubnetPublic1Id' }
+
+  SubnetPublic2Id:
+    Value: !Ref SubnetPublic2
+    Export: { Name: !Sub '${AWS::StackName}-SubnetPublic2Id' }
+
+  SubnetApp1Id:
+    Value: !Ref SubnetApp1
+    Export: { Name: !Sub '${AWS::StackName}-SubnetApp1Id' }
+
+  SubnetApp2Id:
+    Value: !Ref SubnetApp2
+    Export: { Name: !Sub '${AWS::StackName}-SubnetApp2Id' }
+
+  SubnetDb1Id:
+    Value: !Ref SubnetDb1
+    Export: { Name: !Sub '${AWS::StackName}-SubnetDb1Id' }
+
+  SubnetDb2Id:
+    Value: !Ref SubnetDb2
+    Export: { Name: !Sub '${AWS::StackName}-SubnetDb2Id' }
+
+  SecurityGroupBastionId:
+    Value: !Ref SecurityGroupBastion
+    Export: { Name: !Sub '${AWS::StackName}-SecurityGroupBastionId' }
+
+  SecurityGroupAlbId:
+    Value: !Ref SecurityGroupAlb
+    Export: { Name: !Sub '${AWS::StackName}-SecurityGroupAlbId' }
+
+  SecurityGroupAppId:
+    Value: !Ref SecurityGroupApp
+    Export: { Name: !Sub '${AWS::StackName}-SecurityGroupAppId' }
+
+  SecurityGroupDbId:
+    Value: !Ref SecurityGroupDb
+    Export: { Name: !Sub '${AWS::StackName}-SecurityGroupDbId' }
+
+  IamInstanceProfileAppName:
+    Value: !Ref IamInstanceProfileApp
+    Export: { Name: !Sub '${AWS::StackName}-IamInstanceProfileAppName' }
+
+  IamInstanceProfileAppArn:
+    Value: !GetAtt IamInstanceProfileApp.Arn
+    Export: { Name: !Sub '${AWS::StackName}-IamInstanceProfileAppArn' }
+
+  S3BucketGuestbookName:
+    Value: !Ref S3BucketGuestbook
+    Export: { Name: !Sub '${AWS::StackName}-S3BucketGuestbookName' }
+
+  BastionInstanceId:
+    Value: !Ref BastionInstance
+    Export: { Name: !Sub '${AWS::StackName}-BastionInstanceId' }
+
+  DbSubnetGroupName:
+    Value: !Ref DbSubnetGroup
+    Export: { Name: !Sub '${AWS::StackName}-DbSubnetGroupName' }
